@@ -39,20 +39,19 @@
   "run test command helper.")
 
 (defcustom testkick-alist
-  '(("RSpec" . ((:command  . "rspec --color --format documentation")
-                (:regexp   . "")
-                (:test-dir . "spec")))
-     
-    ("Mocha" . ((:command  . "mocha --reporter spec")
-                (:regexp   . "")
-                (:test-dir . "test")))
+  '(("rspec"
+     (:command  . "rspec --color --format documentation")
+     (:patterns . ("^\\s-*describe\\s-+\\S-+\\s-+do"))
+     (:test-dir . "spec"))
+    
+    ("mocha"
+     ((:command  . "mocha --reporter spec")
+      (:patterns . ("^\\s-*describe\\s-*(\\s-*['\"]\\S-+['\"]\\s-*,\\s-*function\\s-*("))
+      (:test-dir . "test")))
     )
+  ""
   :group 'testkick)
 
-  ("\\_spec.rb" . "rspec --color --format documentation")
-  ("\\_test.rb" . "")
-  ("\\.js" . "mocha --reporter spec")
-  )
 
 (defcustom testkick-test-file-p-function-alist
   ("\\.rb" . (lambda (cur-file)
@@ -74,21 +73,30 @@
   
   )
 
-(defun testkick-at-current-line ()
-  (interactive)
-  )
-
 (defun testkick-with-more-options (options)
   (interactive)
   )
 
 ;; utils
 
-(defun testkick-find-test-directory ()
-  
-  )
 
-(defun testkick-test-file-p (path)
+(defun testkick-any-test (path)
+  (let* ((buffer (get-file-buffer path))
+         (file-not-opened (null buffer)))
+    (when file-not-opened
+      (setq buffer (find-file-noselect path)))
+
+    (with-current-buffer buffer
+      (loop named find-test
+            for test in testkick-alist
+            do (destructuring-bind (name . alist) test
+                 (loop for pattern in (cdr (assoc :patterns alist))
+                       do (when (and (goto-char (point-min))
+                                     (re-search-forward pattern nil t))
+                            (return-from find-test test)))))
+      )))
+
+(defun testkick-find-test-directory ()
   
   )
 
