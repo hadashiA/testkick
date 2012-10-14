@@ -11,21 +11,6 @@
 
 ;; Contributors: hadashiA
 
-;; This file is free software; you can redistribute it and/or modify
-;; it under the terms of the GNU General Public License as published by
-;; the Free Software Foundation; either version 2, or (at your option)
-;; any later version.
-
-;; This file is distributed in the hope that it will be useful,
-;; but WITHOUT ANY WARRANTY; without even the implied warranty of
-;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-;; GNU General Public License for more details.
-
-;; You should have received a copy of the GNU General Public License
-;; along with GNU Emacs; see the file COPYING.  If not, write to
-;; the Free Software Foundation, Inc., 59 Temple Place - Suite 330,
-;; Boston, MA 02111-1307, USA.
-
 ;;; Commentary:
 
 ;;; Code:
@@ -39,15 +24,14 @@
 
 (defcustom testkick-alist
   '(("rspec"
-     (:command   . "rspec --color --format documentation")
-     (:patterns  . ("^\\s-*describe\\s-+\\S-+\\s-+do"))
-     (:test-root . "spec"))
+     :command "rspec --color --format documentation"
+     :patterns ("^\\s-*describe\\s-+\\S-+\\s-+do")
+     :test-root-basename "spec")
     
     ("mocha"
-     (:command   . "mocha --reporter spec")
-     (:patterns  . ("^\\s-*describe\\s-*(\\s-*['\"]\\S-+['\"]\\s-*,\\s-*function\\s-*("))
-     (:test-root . "test"))
-    )
+     :command "mocha --reporter spec"
+     :patterns ("^\\s-*describe\\s-*(\\s-*['\"]\\S-+['\"]\\s-*,\\s-*function\\s-*(")
+     :test-root-basename "test"))
   ""
   :group 'testkick)
 
@@ -79,7 +63,7 @@
   name
   command
   pattern
-  test-root
+  test-root-basename
   test-file
   test-directory
   )
@@ -100,7 +84,11 @@
 
 ;; 
 ;; find test target
-;; 
+;;
+
+(defun testkick-find-test-root (cur-dir)
+  (loop for alist in testkick-alist)
+  )
 
 ;; 
 ;; testkick-test methods
@@ -122,19 +110,19 @@
                      (find-file-noselect file)))
          (result (with-current-buffer buffer
                    (loop named match-patterns
-                         for test in testkick-alist
-                         for alist = (cdr test)
-                         do (loop for pattern in (cdr (assoc :patterns alist))
-                                  do (when (and (goto-char (point-min))
-                                                (re-search-forward pattern nil t))
-                                       (return-from match-patterns
-                                         (make-testkick-test :name (car test)
-                                                             :command (cdr (assoc :command alist))
-                                                             :test-root (cdr (assoc :test-root alist))
-                                                             :pattern pattern
-                                                             :test-file file
-                                                             )))
-                                  )))))
+                         for alist in testkick-alist
+                         do (destructuring-bind (name &key command patterns (test-root-basename nil)) alist
+                              (loop for pattern in patterns
+                                    do (when (and (goto-char (point-min))
+                                                  (re-search-forward pattern nil t))
+                                         (return-from match-patterns
+                                           (make-testkick-test :name name
+                                                               :command command
+                                                               :test-root-basename test-root-basename 
+                                                               :pattern pattern
+                                                               :test-file file
+                                                               )))))
+                         ))))
     (when file-not-opened (kill-buffer buffer))
     result))
 
@@ -158,3 +146,4 @@
         ))
 
 (provide 'testkick)
+
