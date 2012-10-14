@@ -99,7 +99,7 @@
 ;; find test target
 ;;
 
-(defun testkick-find-test-root (&optional cur-dir)
+(defun* testkick-find-test-for-root (&optional cur-dir)
   (setq cur-dir (or cur-dir (testkick-current-directory)))
   (loop for alist in testkick-alist
         do (destructuring-bind (name &key
@@ -107,9 +107,14 @@
                                      test-file-pattern
                                      test-syntax-patterns
                                      (test-root-basename nil)) alist
-             (testkick-awhen (and test-root-basename
-                                  (testkick-find-directory-in-same-project cur-dir test-root-basename))
-               ))))
+             (let* ((test-root (and test-root-basename
+                                    (testkick-find-directory-in-same-project
+                                     cur-dir test-root-basename)))
+                    (test (and test-root
+                               (testkick-find-test-in-directory test-root))))
+               (when test
+                 (setf (testkick-test-test-root-directory test) test-root)
+                 test)))))
 
 (defun* testkick-find-test-in-directory (&optional cur-dir)
   (setq cur-dir (or cur-dir (testkick-current-directory)))
