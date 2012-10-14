@@ -99,6 +99,24 @@
 ;; find test target
 ;;
 
+(defun* testkick-find-test (&optional cur-file)
+  (setq cur-file (or cur-file buffer-file-name))
+  (when (or (null cur-file)
+            (file-directory-p cur-file))
+    (return-from testkick-find-test))
+
+  (or (testkick-test-from-file cur-file)
+      (let* ((basename (replace-regexp-in-string "\\.\\S-+?$" "" 
+                                                 (file-name-nondirectory cur-file)))
+             (test (testkick-find-test-for-root (file-name-directory cur-file)))
+             (test-root (testkick-test-test-root-directory test)))
+        
+             ))
+      )
+  )
+
+
+
 (defun* testkick-find-test-for-root (&optional cur-dir)
   (setq cur-dir (or cur-dir (testkick-current-directory)))
   (loop for alist in testkick-alist
@@ -210,5 +228,17 @@
                      do (return-from testkick-find-directory-in-same-project (expand-file-name subdir)))))
         ))
 
+(defun testkick-directory-files-recursive (directory &optional full-name match-regexp nosort)
+  (append (directory-files directory full-name match-regexp nosort)
+          (loop for file in (directory-files directory full-name nil match-regexp)
+                when (and (not (string-match "^\\.\\.?$" file))
+                          (file-directory-p file))
+                return (testkick-directory-files-recursive directory full-name match-regexp nosort))
+          ))
+
 (provide 'testkick)
+
+
+
+
 
