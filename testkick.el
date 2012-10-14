@@ -25,19 +25,19 @@
 (defcustom testkick-alist
   '(("rspec"
      :command "rspec --color --format documentation"
-     :file-pattern "_spec\\.rb$"
-     :syntax-patterns ("^\\s-*describe\\s-+\\S-+\\s-+do")
-     :root-basename "spec")
+     :test-file-pattern "_spec\\.rb$"
+     :test-syntax-patterns ("^\\s-*describe\\s-+\\S-+\\s-+do")
+     :test-root-basename "spec")
     
     ("mocha"
      :command "mocha --reporter spec"
-     :file-pattern "\\.js$"
-     :syntax-patterns ("^\\s-*describe\\s-*(\\s-*['\"]\\S-+['\"]\\s-*,\\s-*function\\s-*(")
-     :root-basename "test"))
+     :test-file-pattern "\\.js$"
+     :test-syntax-patterns ("^\\s-*describe\\s-*(\\s-*['\"]\\S-+['\"]\\s-*,\\s-*function\\s-*(")
+     :test-root-basename "test"))
   ""
   :group 'testkick)
 
-(defcustom testkick-parent-directory-search-limit 10
+(defcustom testkick-directory-search-depth-limit 10
   "Number of times up to look for a test directory"
   :group 'testkick)
 
@@ -74,10 +74,11 @@
 (defstruct testkick-test
   name
   command
-  syntax-pattern
-  root-basename
-  file
-  root-directory
+  test-syntax-pattern
+  test-root-basename
+  test-file
+  test-root-directory
+  source-file
   )
 
 ;; 
@@ -103,27 +104,35 @@
   (loop for alist in testkick-alist
         do (destructuring-bind (name &key
                                      command
-                                     file-pattern
-                                     syntax-patterns
-                                     (root-basename nil)) alist
+                                     test-file-pattern
+                                     test-syntax-patterns
+                                     (test-root-basename nil)) alist
              (testkick-awhen (and test-root-basename
                                   (testkick-find-directory-in-same-project cur-dir test-root-basename))
                ))))
 
 (defun* testkick-find-test-in-directory (&optional cur-dir)
   (setq cur-dir (or cur-dir (testkick-current-directory)))
-  (loop for alist in testkick-alist
-        do (destructuring-bind (name &key
-                                     command
-                                     file-pattern
-                                     syntax-patterns
-                                     (root-basename nil)) alist
-             (loop for file in (directory-files cur-dir t file-pattern)
-                   do (testkick-awhen (testkick-test-from-file file)
-                        (return-from it)))
-             (loop for subdir in (directory-files cur-dir t)
-                   when (file-directory-p subdir) (return-from (testkick-find-test-at-directory subdir)))
-             )))
+  (let ((files (directory-files cur-dir t nil t)))
+    (loop for alist in testkick-alist
+          do (destructuring-bind (name &key
+                                       command
+                                       test-file-pattern
+                                       test-syntax-patterns
+                                       (test-root-basename nil)) alist
+               
+               (loop for file in files
+                     unless (string-match "^\\.\\.?$" (file-name-nondirectory file))
+                     if (not (file-directory-p file))
+                     do (let ((test (testkick-test-from-file file)))
+                          (when test
+                            (return-from testkick-find-test-in-directory test)))
+                     else
+                     do (let ((test (testkick-find-test-in-directory file)))
+                          (when test
+                            (return-from testkick-find-test-in-directory test)
+                            ))
+                     )))))
 
 ;; 
 ;; testkick-test methods
@@ -142,24 +151,26 @@
 
   (let* ((file-not-opened (null (get-file-buffer file)))
          (buffer (or (get-file-buffer file)
-                     (find-file-noselect file)))
+                     (with-current-buffer (generate-new-buffer (concat "*testkick " file " *"))
+                       (insert-file-contents file)
+                       (current-buffer))))
          (result (with-current-buffer buffer
                    (loop named match-patterns
                          for alist in testkick-alist
                          do (destructuring-bind (name &key
                                                       command
-                                                      file-pattern
-                                                      syntax-patterns
-                                                      (root-basename nil)) alist
-                              (loop for pattern in syntax-patterns
+                                                      test-file-pattern
+                                                      test-syntax-patterns
+                                                      (test-root-basename nil)) alist
+                              (loop for pattern in test-syntax-patterns
                                     do (when (and (goto-char (point-min))
                                                   (re-search-forward pattern nil t))
                                          (return-from match-patterns
                                            (make-testkick-test :name name
                                                                :command command
-                                                               :root-basename root-basename 
-                                                               :syntax-pattern pattern
-                                                               :file file
+                                                               :test-root-basename test-root-basename 
+                                                               :test-syntax-pattern pattern
+                                                               :test-file file
                                                                )))))
                          ))))
     (when file-not-opened (kill-buffer buffer))
@@ -175,17 +186,23 @@
     (or (buffer-file-name)
         default-directory))))
 
+(defun testkick-directory-files-without-dot (directory)
+  (directory-files directory t "^[^.]" t))
+
 (defun* testkick-find-directory-in-same-project (start-directory find-directory-name)
-  (loop for count from 0 to testkick-parent-directory-search-limit
+  (loop for count from 0 to testkick-directory-search-depth-limit
         for cur-dir = (expand-file-name
                        (concat start-directory (apply #'concat (make-list count "/.."))))
         until (string= cur-dir "/")
         when (file-directory-p cur-dir)
-        do (loop for subdir in (directory-files cur-dir t)
-                 when (and (file-directory-p subdir)
+        do (let ((files (testkick-directory-files-without-dot cur-dir)))
+             (when files
+               (loop for subdir in files
+                     when (and 
+                           (file-directory-p subdir)
                            (string= (file-name-nondirectory (expand-file-name subdir))
                                     find-directory-name))
-                 do (return-from testkick-find-directory-in-same-project (expand-file-name subdir)))
+                     do (return-from testkick-find-directory-in-same-project (expand-file-name subdir)))))
         ))
 
 (provide 'testkick)
