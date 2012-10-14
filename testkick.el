@@ -32,72 +32,129 @@
 
 (eval-when-compile (require 'cl))
 
-
-;; custom
+;; custom vars
 
 (defgroup testkick nil
   "run test command helper.")
 
 (defcustom testkick-alist
   '(("rspec"
-     (:command  . "rspec --color --format documentation")
-     (:patterns . ("^\\s-*describe\\s-+\\S-+\\s-+do"))
-     (:test-dir . "spec"))
+     (:command   . "rspec --color --format documentation")
+     (:patterns  . ("^\\s-*describe\\s-+\\S-+\\s-+do"))
+     (:test-root . "spec"))
     
     ("mocha"
-     ((:command  . "mocha --reporter spec")
-      (:patterns . ("^\\s-*describe\\s-*(\\s-*['\"]\\S-+['\"]\\s-*,\\s-*function\\s-*("))
-      (:test-dir . "test")))
+     (:command   . "mocha --reporter spec")
+     (:patterns  . ("^\\s-*describe\\s-*(\\s-*['\"]\\S-+['\"]\\s-*,\\s-*function\\s-*("))
+     (:test-root . "test"))
     )
   ""
   :group 'testkick)
 
+(defcustom testkick-parent-directory-search-limit 10
+  "Number of times up to look for a test directory"
+  :group 'testkick)
 
-(defcustom testkick-test-file-p-function-alist
-  ("\\.rb" . (lambda (cur-file)
-               
-               ))
-  ("\\.js") . (lambda (cur-file)
-                
-                ))
+;;
+;; macros
+;;
+
+(defmacro testkick-aif (test-form then-form &rest else-forms)
+  "Anaphoric if. Temporary variable `it' is the result of test-form."
+  `(let ((it ,test-form))
+     (if it ,then-form ,@else-forms)))
+(put #'testkick-aif 'lisp-indent-function 2)
+
+(defmacro testkick-awhen (test-form &rest body)
+  "Anaphoric when."
+  (declare (indent 1))
+  `(testkick-aif ,test-form
+	(progn ,@body)))
+
+;; 
+;; structs
+;; 
+
+(defstruct testkick-test
+  name
+  command
+  pattern
+  test-root
+  test-file
+  test-directory
   )
 
-;; interactive 
+;; 
+;; commands
+;; 
 
-(defun testkick (&optional file-or-directory)
-  (interactive "ftest file or directory: ")
-  (let ((file (if (file-directory-p file-or-directory)
-                  nil
-                file-or-directory)
-              )))
-  
-  )
+(defun testkick ()
+  (interactive)
+  (unless (file-directory-p buffer-file-name)
+    (testkick-awhen (testkick-test-from-file buffer-file-name)
+      (testkick-test-run it))))
 
 (defun testkick-with-more-options (options)
   (interactive)
   )
 
-;; utils
+;; 
+;; find test target
+;; 
 
+;; 
+;; testkick-test methods
+;; 
 
-(defun testkick-any-test (path)
-  (let* ((buffer (get-file-buffer path))
-         (file-not-opened (null buffer)))
-    (when file-not-opened
-      (setq buffer (find-file-noselect path)))
+(defun testkick-test-run (testkick-test &optional target)
+  (testkick-aif (or target
+                    (testkick-test-test-file testkick-test)
+                    (testkick-test-test-directory testkick-test))
+      (compile (concat (testkick-test-command testkick-test) " " it))
+    (error "invalid test target %s" testkick-test)))
 
-    (with-current-buffer buffer
-      (loop named find-test
-            for test in testkick-alist
-            do (destructuring-bind (name . alist) test
-                 (loop for pattern in (cdr (assoc :patterns alist))
-                       do (when (and (goto-char (point-min))
-                                     (re-search-forward pattern nil t))
-                            (return-from find-test test)))))
-      )))
+(defun* testkick-test-from-file (file)
+  (when (file-directory-p file)
+    (return-from testkick-test-from-file))
 
-(defun testkick-find-test-directory ()
-  
-  )
+  (let* ((file-not-opened (null (get-file-buffer file)))
+         (buffer (or (get-file-buffer file)
+                     (find-file-noselect file)))
+         (result (with-current-buffer buffer
+                   (loop named match-patterns
+                         for test in testkick-alist
+                         for alist = (cdr test)
+                         do (loop for pattern in (cdr (assoc :patterns alist))
+                                  do (when (and (goto-char (point-min))
+                                                (re-search-forward pattern nil t))
+                                       (return-from match-patterns
+                                         (make-testkick-test :name (car test)
+                                                             :command (cdr (assoc :command alist))
+                                                             :test-root (cdr (assoc :test-root alist))
+                                                             :pattern pattern
+                                                             :test-file file
+                                                             )))
+                                  )))))
+    (when file-not-opened (kill-buffer buffer))
+    result))
+
+;; 
+;; generic utils
+;; 
+
+(defun testkick-current-directory ()
+  (file-name-directory
+   (expand-file-name
+    (or (buffer-file-name)
+        default-directory))))
+
+(defun testkick-find-parent-directory (start-directory find-directory-name)
+  (loop for count from 0 to 10
+        for cur-dir = (expand-file-name
+                       (concat start-directory (apply #'concat (make-list count "/.."))))
+        until (string= cur-dir "/")
+        when (string= (file-name-nondirectory cur-dir) find-directory-name)
+        do (return cur-dir)
+        ))
 
 (provide 'testkick)
