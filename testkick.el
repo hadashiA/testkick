@@ -57,15 +57,16 @@
   `(testkick-aif ,test-form
 	(progn ,@body)))
 
-(defmacro testkick-alist-loop (args &rest body)
+(defmacro testkick-alist-loop (&rest body)
+  (declare (indent 1))
   `(loop for alist in testkick-alist
-         do (let (loop for arg in args
-                       for key = (intern (concat ":" (symbol-name arg)))
-                       for value = (cond
-                                    ((equal arg 'name) (car alist))
-                                    (t (cadr (memq key (cdr alist)))))
-                       collect (list arg value))
-              ,@body)))
+         do (let ,(loop for arg in (car body)
+                        for key = (intern (concat ":" (symbol-name arg)))
+                        collect (list arg `(cond
+                                            ((equal (quote ,arg) 'name) (car alist))
+                                            (t (cadr (memq ,key (cdr alist)))))
+                                      ))
+              (return ,@(cdr body)))))
 
 ;; 
 ;; structs
@@ -112,10 +113,7 @@
              (test-root (testkick-test-test-root-directory test)))
         
              ))
-      )
   )
-
-
 
 (defun* testkick-find-test-for-root (&optional cur-dir)
   (setq cur-dir (or cur-dir (testkick-current-directory)))
@@ -126,36 +124,20 @@
                                      test-syntax-patterns
                                      (test-root-basename nil)) alist
              (let* ((test-root (and test-root-basename
-                                    (testkick-find-directory-in-same-project
-                                     cur-dir test-root-basename)))
+                                    (testkick-find-file-in-same-project
+                                     cur-dir
+                                     #'(lambda (path)
+                                         (when (and (file-directory-p path)
+                                                    (string= test-root-basename
+                                                             (file-name-nondirectory
+                                                              (expand-file-name path))))
+                                           path)))))
                     (test (and test-root
-                               (testkick-find-test-in-directory test-root))))
+                               (testkick-find-file-recursive test-root
+                                                             #'testkick-test-from-file))))
                (when test
                  (setf (testkick-test-test-root-directory test) test-root)
-                 test)))))
-
-(defun* testkick-find-test-in-directory (&optional cur-dir)
-  (setq cur-dir (or cur-dir (testkick-current-directory)))
-  (let ((files (directory-files cur-dir t nil t)))
-    (loop for alist in testkick-alist
-          do (destructuring-bind (name &key
-                                       command
-                                       test-file-pattern
-                                       test-syntax-patterns
-                                       (test-root-basename nil)) alist
-               
-               (loop for file in files
-                     unless (string-match "^\\.\\.?$" (file-name-nondirectory file))
-                     if (not (file-directory-p file))
-                     do (let ((test (testkick-test-from-file file)))
-                          (when test
-                            (return-from testkick-find-test-in-directory test)))
-                     else
-                     do (let ((test (testkick-find-test-in-directory file)))
-                          (when test
-                            (return-from testkick-find-test-in-directory test)
-                            ))
-                     )))))
+                 (return-from testkick-find-test-for-root test))))))
 
 ;; 
 ;; testkick-test methods
@@ -212,33 +194,26 @@
 (defun testkick-directory-files-without-dot (directory)
   (directory-files directory t "^[^.]" t))
 
-(defun* testkick-find-directory-in-same-project (start-directory find-directory-name)
+(defun* testkick-find-file-in-same-project (start-directory callback)
   (loop for count from 0 to testkick-directory-search-depth-limit
         for cur-dir = (expand-file-name
                        (concat start-directory (apply #'concat (make-list count "/.."))))
         until (string= cur-dir "/")
-        when (file-directory-p cur-dir)
         do (let ((files (testkick-directory-files-without-dot cur-dir)))
              (when files
                (loop for subdir in files
-                     when (and 
-                           (file-directory-p subdir)
-                           (string= (file-name-nondirectory (expand-file-name subdir))
-                                    find-directory-name))
-                     do (return-from testkick-find-directory-in-same-project (expand-file-name subdir)))))
+                     do (let ((result (funcall callback subdir)))
+                          (when result
+                            (return-from testkick-find-file-in-same-project result))))))
         ))
 
-(defun testkick-directory-files-recursive (directory &optional full-name match-regexp nosort)
-  (append (directory-files directory full-name match-regexp nosort)
-          (loop for file in (directory-files directory full-name nil match-regexp)
-                when (and (not (string-match "^\\.\\.?$" file))
-                          (file-directory-p file))
-                return (testkick-directory-files-recursive directory full-name match-regexp nosort))
-          ))
+(defun* testkick-find-file-recursive (cur-dir callback)
+  (let ((files (testkick-directory-files-without-dot cur-dir)))
+    (when files
+      (loop for file in files
+            do (let ((result (funcall callback file)))
+                 (when result (return result)))
+            when (file-directory-p file)
+            return (testkick-find-file-recursive file callback)))))
 
 (provide 'testkick)
-
-
-
-
-
