@@ -89,34 +89,33 @@
 
 (defun testkick ()
   (interactive)
-  (unless (file-directory-p buffer-file-name)
-    (testkick-awhen (testkick-test-from-file buffer-file-name)
-      (testkick-test-run it))))
-
-(defun testkick-with-more-options (options)
-  (interactive)
-  )
-
+  (let ((test (if (file-directory-p buffer-file-name)
+                  nil
+                (testkick-awhen (testkick-find-test-for-file buffer-file-name)
+                  (testkick-test-run it)))))
+    (when test
+      (testkick-test-run test))))
+  
 ;; 
 ;; find test target
 ;;
 
-(defun* testkick-find-test (&optional cur-file)
-  (setq cur-file (or cur-file buffer-file-name))
-  (when (or (null cur-file)
-            (file-directory-p cur-file))
+(defun* testkick-find-test-for-file (source-file)
+  (unless(file-directory-p source-file)
     (return-from testkick-find-test))
 
-  (or (testkick-test-from-file cur-file)
-      (let* ((basename (replace-regexp-in-string "\\.\\S-+?$" "" 
-                                                 (file-name-nondirectory cur-file)))
-             (test (testkick-find-test-for-root (file-name-directory cur-file)))
-             (test-root (testkick-test-test-root-directory test)))
-        
-             ))
-  )
+  (or (testkick-test-from-file source-file)
+      (let* ((test (testkick-find-test-for-root (file-name-directory source-file)))
+             (test-root (testkick-test-test-root-directory test))
+             (source-basename (replace-regexp-in-string "\\..+?$" ""
+                                                        (testkick-file-basename source-file))))
+        (testkick-find-file-recursive test-root
+                                      #'(lambda (test-file)
+                                          (unless (file-directory-p test-file)
+                                            (testkick-match-to-test-file source-basename test-file))))
+        )))
 
-(defun* testkick-find-test-for-root (&optional cur-dir)
+(defun* testkick-find-test-for-root (cur-dir)
   (setq cur-dir (or cur-dir (testkick-current-directory)))
   (testkick-alist-loop (test-root-basename)
     (let* ((test-root (and test-root-basename
@@ -124,8 +123,7 @@
                             cur-dir
                             #'(lambda (path)
                                 (when (and (file-directory-p path)
-                                           (string= test-root-basename
-                                                    (file-name-nondirectory (expand-file-name path))))
+                                           (string= test-root-basename (testkick-file-basename path)))
                                   path)))))
            (test (and test-root
                       (testkick-find-file-recursive test-root
@@ -133,6 +131,14 @@
       (when test
         (setf (testkick-test-test-root-directory test) test-root)
         (return-from testkick-find-test-for-root test)))))
+
+(defun* testkick-match-to-test-file (source-basename test-file)
+  (when (file-directory-p test-file)
+    (return-from testkick-match-to-test-file))
+
+  (let ((test-basename (testkick-file-basename test-file))
+        (match-pos (string-match source-basename test-basename)))
+    (and match-pos (= 0 match-pos))))
 
 ;; 
 ;; testkick-test methods
@@ -182,6 +188,9 @@
    (expand-file-name
     (or (buffer-file-name)
         default-directory))))
+
+(defun testkick-file-basename (path)
+  (file-name-nondirectory (expand-file-name path)))
 
 (defun testkick-directory-files-without-dot (directory)
   (directory-files directory t "^[^.]" t))
