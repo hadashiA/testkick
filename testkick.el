@@ -59,14 +59,15 @@
 
 (defmacro testkick-alist-loop (&rest body)
   (declare (indent 1))
-  `(loop for alist in testkick-alist
+  `(loop named testkick-alist-loop
+         for alist in testkick-alist
          do (let ,(loop for arg in (car body)
                         for key = (intern (concat ":" (symbol-name arg)))
                         collect (list arg `(cond
                                             ((equal (quote ,arg) 'name) (car alist))
                                             (t (cadr (memq ,key (cdr alist)))))
                                       ))
-              (return ,@(cdr body)))))
+              ,@(cdr body))))
 
 ;; 
 ;; structs
@@ -117,27 +118,21 @@
 
 (defun* testkick-find-test-for-root (&optional cur-dir)
   (setq cur-dir (or cur-dir (testkick-current-directory)))
-  (loop for alist in testkick-alist
-        do (destructuring-bind (name &key
-                                     command
-                                     test-file-pattern
-                                     test-syntax-patterns
-                                     (test-root-basename nil)) alist
-             (let* ((test-root (and test-root-basename
-                                    (testkick-find-file-in-same-project
-                                     cur-dir
-                                     #'(lambda (path)
-                                         (when (and (file-directory-p path)
-                                                    (string= test-root-basename
-                                                             (file-name-nondirectory
-                                                              (expand-file-name path))))
-                                           path)))))
-                    (test (and test-root
-                               (testkick-find-file-recursive test-root
-                                                             #'testkick-test-from-file))))
-               (when test
-                 (setf (testkick-test-test-root-directory test) test-root)
-                 (return-from testkick-find-test-for-root test))))))
+  (testkick-alist-loop (test-root-basename)
+    (let* ((test-root (and test-root-basename
+                           (testkick-find-file-in-same-project
+                            cur-dir
+                            #'(lambda (path)
+                                (when (and (file-directory-p path)
+                                           (string= test-root-basename
+                                                    (file-name-nondirectory (expand-file-name path))))
+                                  path)))))
+           (test (and test-root
+                      (testkick-find-file-recursive test-root
+                                                    #'testkick-test-from-file))))
+      (when test
+        (setf (testkick-test-test-root-directory test) test-root)
+        (return-from testkick-find-test-for-root test)))))
 
 ;; 
 ;; testkick-test methods
@@ -154,32 +149,29 @@
   (when (file-directory-p file)
     (return-from testkick-test-from-file))
 
-  (let* ((file-not-opened (null (get-file-buffer file)))
-         (buffer (or (get-file-buffer file)
-                     (with-current-buffer (generate-new-buffer (concat "*testkick " file " *"))
-                       (insert-file-contents file)
-                       (current-buffer))))
-         (result (with-current-buffer buffer
-                   (loop named match-patterns
-                         for alist in testkick-alist
-                         do (destructuring-bind (name &key
-                                                      command
-                                                      test-file-pattern
-                                                      test-syntax-patterns
-                                                      (test-root-basename nil)) alist
-                              (loop for pattern in test-syntax-patterns
-                                    do (when (and (goto-char (point-min))
-                                                  (re-search-forward pattern nil t))
-                                         (return-from match-patterns
-                                           (make-testkick-test :name name
-                                                               :command command
-                                                               :test-root-basename test-root-basename 
-                                                               :test-syntax-pattern pattern
-                                                               :test-file file
-                                                               )))))
-                         ))))
-    (when file-not-opened (kill-buffer buffer))
-    result))
+  (with-current-buffer (testkick-temp-buffer file)
+    (testkick-alist-loop (name command test-root-basename test-syntax-patterns)
+      (loop for pattern in test-syntax-patterns
+            when (and (goto-char (point-min))
+                      (re-search-forward pattern nil t))
+            do (return-from testkick-test-from-file
+                 (make-testkick-test :name name
+                                     :command command
+                                     :test-root-basename test-root-basename 
+                                     :test-syntax-pattern pattern
+                                     :test-file file
+                                     ))))))
+
+;;
+;; temp buffer
+;;
+
+(defun testkick-temp-buffer (file)
+  (or (get-file-buffer file)
+      (with-current-buffer (get-buffer-create "*testkick temp*")
+        (erase-buffer)
+        (insert-file-contents file)
+        (current-buffer))))
 
 ;; 
 ;; generic utils
