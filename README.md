@@ -27,6 +27,7 @@ M-x testkick
 ```
 
 * Additional
+
 ```cl
 ;; Settings for your shorthand.
 (global-set-key "\C-," 'testkick)
