@@ -64,7 +64,15 @@
   `(testkick-aif ,test-form
 	(progn ,@body)))
 
+(defmacro testkick-aand (&rest args)
+  "Anaphoric and"
+  (declare (indent 0))
+  (cond ((null args) t)
+	((null (cdr args)) (car args))
+	(t `(testkick-aif ,(car args) (testkick-aand ,@(cdr args))))))
+
 (defmacro testkick-alist-loop (&rest body)
+  "loop for testkick-alist"
   (declare (indent 1))
   `(loop named testkick-alist-loop
          for alist in testkick-alist
@@ -91,6 +99,7 @@
 ;; 
 ;; caching
 ;;
+
 (defvar testkick-test-root nil)
 (make-variable-buffer-local 'testkick-test-root)
 
@@ -113,15 +122,8 @@
 ;;;###autoload
 (defun testkick-test-root ()
   (interactive)
-  ;; pending
-  )
-
-;;;###autoload
-(defun testkick-at (file-or-directory)
-  (interactive)
-  ;; pending
-  )
-
+  (testkick-awhen (testkick-find-test-root (testkick-current-directory))
+    (testkick-test-run it (testkick-test-test-root-directory it))))
 
 ;; 
 ;; find test target
@@ -132,34 +134,33 @@
     (setq cur-dir (file-name-directory cur-dir)))
 
   (testkick-alist-loop (test-root-basename)
-    (let* ((like-it-dir (and test-root-basename
-                             (testkick-find-file-in-same-project
-                              cur-dir
-                              #'(lambda (path)
-                                  (when (and (file-directory-p path)
-                                             (string= test-root-basename
-                                                      (testkick-file-basename path)))
-                                    path))))))
-      (when (and like-it-dir
-                 (testkick-find-file-recursive like-it-dir
-                                               #'testkick-test-from-file))
-        (return-from testkick-find-test-root like-it-dir)))))
+    (let* ((like-it-dir (testkick-aand test-root-basename
+                                       (testkick-find-file-in-same-project
+                                        cur-dir
+                                        #'(lambda (path)
+                                            (when (and (file-directory-p path)
+                                                       (string= test-root-basename
+                                                                (testkick-file-basename path)))
+                                              path)))))
+           (test (when like-it-dir
+                   (testkick-find-file-recursive like-it-dir #'testkick-test-from-file))))
+      (when test
+        (setf (testkick-test-test-root-directory test) like-it-dir)
+        (return-from testkick-find-test-root test)))))
 
 (defun* testkick-find-test-for-file (source-file)
   (when (file-directory-p source-file)
     (return-from testkick-find-test-for-file))
 
   (or (testkick-test-from-file source-file)
-      (let* ((test-root (testkick-find-test-root (file-name-directory source-file)))
-             (test-file (and test-root
-                             (testkick-find-file-recursive
-                              test-root
-                              #'(lambda (test-file)
-                                  (unless (file-directory-p test-file)
-                                    (testkick-equal-to-test-file source-file test-file)
-                                    test-file))))))
-        (when test-file
-          (testkick-test-from-file test-file)))))
+      (testkick-aand (testkick-find-test-root (file-name-directory source-file))
+                     (testkick-test-test-root-directory it)
+                     (testkick-find-file-recursive
+                      it #'(lambda (test-file)
+                             (unless (file-directory-p test-file)
+                               (testkick-equal-to-test-file source-file test-file)
+                               test-file)))
+                     (testkick-test-from-file it))))
 
 (defun* testkick-equal-to-test-file (source-file test-file)
   (when (file-directory-p test-file)
@@ -167,7 +168,7 @@
 
   (let* ((source-basename (testkick-file-basename source-file))
          (test-basename (testkick-file-basename test-file))
-         (match-pos (string-match (replace-regexp-in-string "\\..+?$" ""source-basename)
+         (match-pos (string-match (replace-regexp-in-string "\\..+?$" "" source-basename)
                                   test-basename)))
     (and match-pos (= 0 match-pos))))
 
