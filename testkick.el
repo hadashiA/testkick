@@ -104,12 +104,11 @@
 ;;;###autoload
 (defun testkick ()
   (interactive)
-  (let ((test (if (file-directory-p buffer-file-name)
-                  nil
-                (testkick-awhen (testkick-find-test-for-file buffer-file-name)
-                  (testkick-test-run it)))))
-    (when test
-      (testkick-test-run test))))
+  (if buffer-file-name
+      (testkick-aif (testkick-find-test-for-file buffer-file-name)
+          (testkick-test-run it buffer-file-name)
+        (message "test not found."))
+    nil))
   
 ;;;###autoload
 (defun testkick-test-root ()
@@ -176,12 +175,8 @@
 ;; testkick-test methods
 ;; 
 
-(defun testkick-test-run (testkick-test &optional target)
-  (testkick-aif (or target
-                    (testkick-test-test-file testkick-test)
-                    (testkick-test-test-directory testkick-test))
-      (compile (concat (testkick-test-command testkick-test) " " it))
-    (error "invalid test target %s" testkick-test)))
+(defun testkick-test-run (test target)
+  (compile (concat (testkick-test-command test) " " target)))
 
 (defun* testkick-test-from-file (file)
   (when (file-directory-p file)
