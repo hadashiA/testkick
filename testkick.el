@@ -134,26 +134,29 @@
         (return-from testkick-find-test-root like-it-dir)))))
 
 (defun* testkick-find-test-for-file (source-file)
-  (unless(file-directory-p source-file)
-    (return-from testkick-find-test))
+  (when (file-directory-p source-file)
+    (return-from testkick-find-test-for-file))
 
   (or (testkick-test-from-file source-file)
-      (let* ((test (testkick-find-test-for-root (file-name-directory source-file)))
-             (test-root (testkick-test-test-root-directory test))
-             (source-basename (replace-regexp-in-string "\\..+?$" ""
-                                                        (testkick-file-basename source-file))))
-        (testkick-find-file-recursive test-root
-                                      #'(lambda (test-file)
-                                          (unless (file-directory-p test-file)
-                                            (testkick-match-to-test-file source-basename test-file))))
-        )))
+      (let* ((test-root (testkick-find-test-root (file-name-directory source-file)))
+             (test-file (and test-root
+                             (testkick-find-file-recursive
+                              test-root
+                              #'(lambda (test-file)
+                                  (unless (file-directory-p test-file)
+                                    (testkick-equal-to-test-file source-file test-file)
+                                    test-file))))))
+        (when test-file
+          (testkick-test-from-file test-file)))))
 
-(defun* testkick-match-to-test-file (source-basename test-file)
+(defun* testkick-equal-to-test-file (source-file test-file)
   (when (file-directory-p test-file)
     (return-from testkick-match-to-test-file))
 
-  (let ((test-basename (testkick-file-basename test-file))
-        (match-pos (string-match source-basename test-basename)))
+  (let* ((source-basename (testkick-file-basename source-file))
+         (test-basename (testkick-file-basename test-file))
+         (match-pos (string-match (replace-regexp-in-string "\\..+?$" ""source-basename)
+                                  test-basename)))
     (and match-pos (= 0 match-pos))))
 
 ;; 
