@@ -12,23 +12,30 @@ Supported test frameworks.
 
 ## Usage
 
-run your testcode of editing file.
+Run your testcode of current file.
 ```
 M-x testkick
 ```
 
 ## Installation
 
-1. copy testkick.el file to your load-path.
-2. add this to your init.el 
+1. Copy testkick.el file to your load-path.
+2. Add this to your init.el 
 
 ```cl
 (autoload 'testkick "testkick" nil t)
 ```
 
+3. Settings for your shorthand.
+
+```cl
+(global-set-key "\C-," 'testkick)
+```
+
 ## TODO
-* interactive interface
-* some caching
-* test case filter and run (rspec --line, vows -r, etc..)
-* anything interface.
+* Run test root directory
+* Interactive interface
+* Test case filter and run (rspec --line, vows -r, etc..)
+* Caching
+* anything interface
 
