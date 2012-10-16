@@ -111,6 +111,19 @@
     (when test
       (testkick-test-run test))))
   
+;;;###autoload
+(defun testkick-test-root ()
+  (interactive)
+  ;; pending
+  )
+
+;;;###autoload
+(defun testkick-at (file-or-directory)
+  (interactive)
+  ;; pending
+  )
+
+
 ;; 
 ;; find test target
 ;;
