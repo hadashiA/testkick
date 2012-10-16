@@ -26,13 +26,20 @@
   '(("rspec"
      :command "rspec --color --format documentation"
      :test-file-pattern "_spec\\.rb$"
-     :test-syntax-patterns ("^\\s-*describe\\s-+\\S-+\\s-+do")
+     :test-syntax-pattern "^\\s-*describe\\s-+\\S-+\\s-+do"
      :test-root-basename "spec")
     
+    ("vows"
+     :command "vows --spec"
+     :test-file-pattern "\\.js$"
+     :test-syntax-pattern "vows\\.describe(.+[^\\S-]*.*addBatch("
+     :test-root-basename "test"
+     )
+
     ("mocha"
      :command "mocha --reporter spec"
      :test-file-pattern "\\.js$"
-     :test-syntax-patterns ("^\\s-*describe\\s-*(\\s-*['\"]\\S-+['\"]\\s-*,\\s-*function\\s-*(")
+     :test-syntax-pattern "^\\s-*describe\\s-*(\\s-*['\"]\\S-+['\"]\\s-*,\\s-*function\\s-*("
      :test-root-basename "test"))
   ""
   :group 'testkick)
@@ -76,17 +83,25 @@
 (defstruct testkick-test
   name
   command
-  test-syntax-pattern
-  test-root-basename
   test-file
   test-root-directory
   source-file
   )
 
 ;; 
+;; caching
+;;
+(defvar testkick-test-root nil)
+(make-variable-buffer-local 'testkick-test-root)
+
+(defvar testkick-test nil)
+(make-variable-frame-local 'testkick-test)
+
+;; 
 ;; commands
 ;; 
 
+;;;###autoload
 (defun testkick ()
   (interactive)
   (let ((test (if (file-directory-p buffer-file-name)
@@ -99,6 +114,24 @@
 ;; 
 ;; find test target
 ;;
+
+(defun* testkick-find-test-root (cur-dir)
+  (unless (file-directory-p cur-dir)
+    (setq cur-dir (file-name-directory cur-dir)))
+
+  (testkick-alist-loop (test-root-basename)
+    (let* ((like-it-dir (and test-root-basename
+                             (testkick-find-file-in-same-project
+                              cur-dir
+                              #'(lambda (path)
+                                  (when (and (file-directory-p path)
+                                             (string= test-root-basename
+                                                      (testkick-file-basename path)))
+                                    path))))))
+      (when (and like-it-dir
+                 (testkick-find-file-recursive like-it-dir
+                                               #'testkick-test-from-file))
+        (return-from testkick-find-test-root like-it-dir)))))
 
 (defun* testkick-find-test-for-file (source-file)
   (unless(file-directory-p source-file)
@@ -114,23 +147,6 @@
                                           (unless (file-directory-p test-file)
                                             (testkick-match-to-test-file source-basename test-file))))
         )))
-
-(defun* testkick-find-test-for-root (cur-dir)
-  (setq cur-dir (or cur-dir (testkick-current-directory)))
-  (testkick-alist-loop (test-root-basename)
-    (let* ((test-root (and test-root-basename
-                           (testkick-find-file-in-same-project
-                            cur-dir
-                            #'(lambda (path)
-                                (when (and (file-directory-p path)
-                                           (string= test-root-basename (testkick-file-basename path)))
-                                  path)))))
-           (test (and test-root
-                      (testkick-find-file-recursive test-root
-                                                    #'testkick-test-from-file))))
-      (when test
-        (setf (testkick-test-test-root-directory test) test-root)
-        (return-from testkick-find-test-for-root test)))))
 
 (defun* testkick-match-to-test-file (source-basename test-file)
   (when (file-directory-p test-file)
@@ -156,17 +172,14 @@
     (return-from testkick-test-from-file))
 
   (with-current-buffer (testkick-temp-buffer file)
-    (testkick-alist-loop (name command test-root-basename test-syntax-patterns)
-      (loop for pattern in test-syntax-patterns
-            when (and (goto-char (point-min))
-                      (re-search-forward pattern nil t))
-            do (return-from testkick-test-from-file
-                 (make-testkick-test :name name
-                                     :command command
-                                     :test-root-basename test-root-basename 
-                                     :test-syntax-pattern pattern
-                                     :test-file file
-                                     ))))))
+    (testkick-alist-loop (name command test-syntax-pattern)
+      (goto-char (point-min))
+      (when (re-search-forward test-syntax-pattern nil t)
+        (return-from testkick-test-from-file
+          (make-testkick-test :name name
+                              :command command
+                              :test-file file
+                              ))))))
 
 ;;
 ;; temp buffer
