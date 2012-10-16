@@ -17,14 +17,25 @@ Run your testcode of current file.
 M-x testkick
 ```
 
+Run project test root directory.
+```
+M-x testkick-root
+```
+
+Run specify file or directory
+```
+M-x testkick-at
+```
+
 ## Installation
 
 1. Copy testkick.el file to your load-path.
 2. Add this one line to your init.el  
 
 ```cl
-(autoload 'testkick "testkick" nil t)
+(require 'testkick)
 ```
+
 Additional  
 
 ```cl
