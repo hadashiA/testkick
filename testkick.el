@@ -120,10 +120,20 @@
     nil))
   
 ;;;###autoload
-(defun testkick-test-root ()
+(defun testkick-root ()
   (interactive)
   (testkick-awhen (testkick-find-test-root (testkick-current-directory))
     (testkick-test-run it (testkick-test-test-root-directory it))))
+
+;;;###autoload
+(defun testkick-at (file-or-directory)
+  (interactive "ftest file or directory: ")
+  (testkick-aif (if (file-directory-p file-or-directory)
+                    (testkick-find-file-recursive file-or-directory
+                                                  #'testkick-test-from-file)
+                  (testkick-test-from-file file-or-directory))
+      (testkick-test-run it file-or-directory)
+    (message "no sush test code.")))
 
 ;; 
 ;; find test target
