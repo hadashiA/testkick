@@ -21,10 +21,12 @@ M-x testkick
 
 1. Copy testkick.el file to your load-path.
 2. Add this to your init.el 
+
 ```cl
 (autoload 'testkick "testkick" nil t)
 ```
-3. Additional
+
+* Additional
 ```cl
 ;; Settings for your shorthand.
 (global-set-key "\C-," 'testkick)
