@@ -20,13 +20,12 @@ M-x testkick
 ## Installation
 
 1. Copy testkick.el file to your load-path.
-2. Add this to your init.el 
+2. Add this one line to your init.el  
 
 ```cl
 (autoload 'testkick "testkick" nil t)
 ```
-
-* Additional
+Additional  
 
 ```cl
 ;; Settings for your shorthand.
