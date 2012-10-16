@@ -24,6 +24,11 @@ M-x testkick
 
 ```cl
 (autoload 'testkick "testkick" nil t)
+
+;; Coloring on the results of the command shell. Handle escape sequences correctly
+(autoload 'ansi-color-for-comint-mode-on "ansi-color"
+  "Set `ansi-color-for-comint-mode' to t." t)
+(add-hook 'shell-mode-hook 'ansi-color-for-comint-mode-on)
 ```
 
 3. Settings for your shorthand.
