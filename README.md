@@ -1,6 +1,6 @@
 # testkick.el
 
-testkick.el is that Emacs Lisp provides a command.
+testkick.el is Emacs Lisp provides a command.
 Find the test code associated with the current buffer, and run it.
 
 Supported test frameworks.
@@ -21,6 +21,7 @@ M-x testkick
 
 1. copy testkick.el file to your load-path.
 2. add this to your init.el 
+
 ```cl
 (autoload 'testkick "testkick" nil t)
 ```
