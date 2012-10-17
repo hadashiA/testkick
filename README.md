@@ -12,7 +12,7 @@ Supported test frameworks.
 
 ## Usage
 
-Run your test code associated of current buffere of current file.
+Run your test code associated of current buffer.
 ```
 M-x testkick
 ```
