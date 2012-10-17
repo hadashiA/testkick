@@ -131,7 +131,7 @@
                                                   #'testkick-test-from-file)
                   (testkick-test-from-file file-or-directory))
       (testkick-test-run it file-or-directory)
-    (message "no sush test code.")))
+    (message "no such test code.")))
 
 ;; 
 ;; find test target
