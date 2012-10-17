@@ -20,27 +20,28 @@
 (defgroup testkick nil
   "run test command helper.")
 
-(defcustom testkick-alist
+(defvar testkick-alist
   '(("rspec"
-     :command "rspec --color --format documentation"
-     :test-file-pattern "_spec\\.rb$"
-     :test-syntax-pattern "^\\s-*describe\\s-+\\S-+\\s-+do"
-     :test-root-basename "spec")
+     (command . "rspec --color --format documentation")
+     (test-file-pattern   . "_spec\\.rb$")
+     (test-syntax-pattern . "^\\s-*describe\\s-+\\S-+\\s-+do")
+     (test-root-basename  . "spec")
+     )
     
     ("vows"
-     :command "vows --spec"
-     :test-file-pattern "\\.js$"
-     :test-syntax-pattern "vows\\.describe(.+[^\\S-]*.*addBatch("
-     :test-root-basename "test"
+     (command . "vows --spec")
+     (test-file-pattern   . "\\.js$")
+     (test-syntax-pattern . "vows\\.describe(.+[^\\S-]*.*addBatch(")
+     (test-root-basename  . "test")
      )
 
     ("mocha"
-     :command "mocha --reporter spec"
-     :test-file-pattern "\\.js$"
-     :test-syntax-pattern "^\\s-*describe\\s-*(\\s-*['\"]\\S-+['\"]\\s-*,\\s-*function\\s-*("
-     :test-root-basename "test"))
-  ""
-  :group 'testkick)
+     (command . "mocha --reporter spec")
+     (test-file-pattern   . "\\.js$")
+     (test-syntax-pattern . "^\\s-*describe\\s-*(\\s-*['\"]\\S-+['\"]\\s-*,\\s-*function\\s-*(")
+     (test-root-basename  . "test")
+     )
+    ))
 
 (defcustom testkick-directory-search-depth-limit 10
   "Number of times up to look for a test directory"
@@ -75,10 +76,9 @@
   `(loop named testkick-alist-loop
          for alist in testkick-alist
          do (let ,(loop for arg in (car body)
-                        for key = (intern (concat ":" (symbol-name arg)))
                         collect (list arg `(cond
                                             ((equal (quote ,arg) 'name) (car alist))
-                                            (t (cadr (memq ,key (cdr alist)))))
+                                            (t (cdr (assoc (quote ,arg) (cdr alist)))))
                                       ))
               ,@(cdr body))))
 
@@ -147,6 +147,23 @@
                  (testkick-test-test-file it)
                  (and (file-exists-p it)
                       (find-file it))))
+
+;; 
+;; settings helper
+;;
+
+(defun testkick-alist-update (name update-alist)
+  (let ((alist (loop for alist in testkick-alist
+                     when (string= (car alist) name)
+                     return alist)))
+    (if alist
+        (loop for cons in update-alist
+              for key = (car cons)
+              for val = (cdr cons)
+              do (setf (cdr (assoc key alist)) val)
+              )
+      (add-to-list 'testkick-alist (cons name update-alist) t))
+    ))
 
 ;; 
 ;; find test target
