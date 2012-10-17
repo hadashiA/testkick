@@ -113,7 +113,7 @@
   (interactive)
   (if buffer-file-name
       (testkick-aif (testkick-find-test-for-file buffer-file-name)
-          (testkick-test-run it (testkick-test-test-file it))
+          (testkick-test-run it :test-file)
         (message "test not found."))
     nil))
   
@@ -121,7 +121,7 @@
 (defun testkick-root ()
   (interactive)
   (testkick-awhen (testkick-find-test-root (testkick-current-directory))
-    (testkick-test-run it (testkick-test-test-root-directory it))))
+    (testkick-test-run it :test-root-directory)))
 
 ;;;###autoload
 (defun testkick-at (file-or-directory)
@@ -185,6 +185,9 @@
 ;; 
 
 (defun testkick-test-run (test target)
+  (setq target (case target
+                 (:test-file (testkick-test-test-file test))
+                 (:test-root-directory (testkick-test-test-root-directory test))))
   (compile (concat (testkick-test-command test) " " target)))
 
 (defun* testkick-test-from-file (file)
