@@ -7,9 +7,7 @@
 ;; Keywords: tools, unix, rspec, mocha
 ;; Created: 2012-10-14
 ;; Compatibility: Emacs 23 or later
-;; URL(en): http://github.com/f-kubotar/testkick
-
-;; Contributors: hadashiA
+;; URL: http://github.com/f-kubotar/testkick
 
 ;;; Commentary:
 
@@ -115,7 +113,7 @@
   (interactive)
   (if buffer-file-name
       (testkick-aif (testkick-find-test-for-file buffer-file-name)
-          (testkick-test-run it buffer-file-name)
+          (testkick-test-run it (testkick-test-test-file it))
         (message "test not found."))
     nil))
   
@@ -144,14 +142,14 @@
     (setq cur-dir (file-name-directory cur-dir)))
 
   (testkick-alist-loop (test-root-basename)
-    (let* ((like-it-dir (testkick-aand test-root-basename
-                                       (testkick-find-file-in-same-project
-                                        cur-dir
-                                        #'(lambda (path)
-                                            (when (and (file-directory-p path)
-                                                       (string= test-root-basename
-                                                                (testkick-file-basename path)))
-                                              path)))))
+    (let* ((like-it-dir (and test-root-basename
+                             (testkick-find-file-in-same-project
+                              cur-dir
+                              #'(lambda (path)
+                                  (when (and (file-directory-p path)
+                                             (string= test-root-basename
+                                                      (testkick-file-basename path)))
+                                    path)))))
            (test (when like-it-dir
                    (testkick-find-file-recursive like-it-dir #'testkick-test-from-file))))
       (when test
@@ -167,8 +165,8 @@
                      (testkick-test-test-root-directory it)
                      (testkick-find-file-recursive
                       it #'(lambda (test-file)
-                             (unless (file-directory-p test-file)
-                               (testkick-equal-to-test-file source-file test-file)
+                             (when (and (null (file-directory-p test-file))
+                                        (testkick-equal-to-test-file source-file test-file))
                                test-file)))
                      (testkick-test-from-file it))))
 
@@ -247,9 +245,10 @@
   (let ((files (testkick-directory-files-without-dot cur-dir)))
     (when files
       (loop for file in files
-            do (let ((result (funcall callback file)))
-                 (when result (return result)))
-            when (file-directory-p file)
-            return (testkick-find-file-recursive file callback)))))
+            do (let ((result (or (funcall callback file)  
+                                 (when (file-directory-p file)
+                                   (testkick-find-file-recursive file callback)))))
+                 (when result
+                   (return result)))))))
 
 (provide 'testkick)
