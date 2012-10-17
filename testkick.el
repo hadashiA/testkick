@@ -43,8 +43,12 @@
      )
     ))
 
-(defcustom testkick-directory-search-depth-limit 10
-  "Number of times up to look for a test directory"
+(defcustom testkick-directory-search-parent-limit 10
+  "Number of times up to look for a parent directory"
+  :group 'testkick)
+
+(defcustom testkick-directory-search-depth-limit 7
+  "Number of times down to look for a child directories"
   :group 'testkick)
 
 ;;
@@ -181,7 +185,8 @@
                                   (when (and (file-directory-p path)
                                              (string= test-root-basename
                                                       (testkick-file-basename path)))
-                                    path)))))
+                                    path))
+                              1)))
            (test (when like-it-dir
                    (testkick-find-file-recursive like-it-dir #'testkick-test-from-file))))
       (when test
@@ -263,26 +268,27 @@
 (defun testkick-directory-files-without-dot (directory)
   (directory-files directory t "^[^.]" t))
 
-(defun* testkick-find-file-in-same-project (start-directory callback)
-  (loop for count from 0 to testkick-directory-search-depth-limit
+(defun* testkick-find-file-in-same-project (start-directory callback max-depth)
+  (loop for count from 0 to testkick-directory-search-parent-limit
         for cur-dir = (expand-file-name
                        (concat start-directory (apply #'concat (make-list count "/.."))))
         until (string= cur-dir "/")
-        do (let ((files (testkick-directory-files-without-dot cur-dir)))
-             (when files
-               (loop for subdir in files
-                     do (let ((result (funcall callback subdir)))
-                          (when result
-                            (return-from testkick-find-file-in-same-project result))))))
-        ))
+        do (let ((result (testkick-find-file-recursive cur-dir callback max-depth)))
+             (when result
+               (return-from testkick-find-file-in-same-project result)))))
 
-(defun* testkick-find-file-recursive (cur-dir callback)
+(defun* testkick-find-file-recursive (cur-dir callback &optional (max-depth nil) (depth 0))
+  (when (and max-depth
+             (>= depth max-depth))
+    (return-from testkick-find-file-recursive))
+
   (let ((files (testkick-directory-files-without-dot cur-dir)))
     (when files
       (loop for file in files
             do (let ((result (or (funcall callback file)  
                                  (when (file-directory-p file)
-                                   (testkick-find-file-recursive file callback)))))
+                                   (testkick-find-file-recursive file callback max-depth
+                                                                 (+ 1 depth))))))
                  (when result
                    (return result)))))))
 
