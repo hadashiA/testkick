@@ -112,7 +112,7 @@
 ;;
 
 (defvar testkick-test nil)
-(make-variable-frame-local 'testkick-test)
+(make-variable-buffer-local 'testkick-test)
 
 ;; 
 ;; commands
@@ -205,7 +205,12 @@
                              (when (and (null (file-directory-p test-file))
                                         (testkick-equal-to-test-file source-file test-file))
                                test-file)))
-                     (testkick-test-from-file it))))
+                     (testkick-test-from-file it)
+                     (progn
+                       (setf (testkick-test-source-file it) source-file)
+                       (with-current-buffer (get-file-buffer source-file)
+                         (setq testkick-test it))
+                       it))))
 
 (defun* testkick-equal-to-test-file (source-file test-file)
   (when (file-directory-p test-file)
@@ -230,16 +235,22 @@
       (goto-char (point-min))
       (when (re-search-forward test-syntax-pattern nil t)
         (return-from testkick-test-from-file
-          (new-testkick-test name :command command :test-file file)))
-      )))
+          (testkick-awhen (new-testkick-test name :command command :test-file file)
+            (setq testkick-test it)))
+        ))))
 
 (defun testkick-test-run (test target)
   (compile (concat (testkick-test-command test) " "
                    (case target
                      (:test-file (testkick-test-test-file test))
                      (:test-root-directory (testkick-test-test-root-directory test))
-                     (t target)))
-           ))
+                     (t target)))))
+
+(defun testkick-test-find-source-file (test)
+  (or (testkick-test-source-file test)
+      (testkick-awhen (read-file-name "Enter source file path: ")
+        (setf (testkick-test-source-file test) it)
+        )))
 
 ;;
 ;; temp buffer
