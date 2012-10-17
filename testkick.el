@@ -86,7 +86,16 @@
 ;; structs
 ;; 
 
-(defstruct testkick-test
+(defstruct (testkick-test
+            (:constructor
+             new-testkick-test
+             (name &key command test-file test-root-directory source-file
+                   &aux
+                   (command (or command
+                                (error "argument :command must not be nil")))
+                   (test-file (or test-file
+                                  (error "argument :test-file must not be nil")))
+                   )))
   name
   command
   test-file
@@ -193,12 +202,6 @@
 ;; testkick-test methods
 ;; 
 
-(defun testkick-test-run (test target)
-  (setq target (case target
-                 (:test-file (testkick-test-test-file test))
-                 (:test-root-directory (testkick-test-test-root-directory test))))
-  (compile (concat (testkick-test-command test) " " target)))
-
 (defun* testkick-test-from-file (file)
   (when (file-directory-p file)
     (return-from testkick-test-from-file))
@@ -208,10 +211,14 @@
       (goto-char (point-min))
       (when (re-search-forward test-syntax-pattern nil t)
         (return-from testkick-test-from-file
-          (make-testkick-test :name name
-                              :command command
-                              :test-file file
-                              ))))))
+          (new-testkick-test name :command command :test-file file)))
+      )))
+
+(defun testkick-test-run (test target)
+  (setq target (case target
+                 (:test-file (testkick-test-test-file test))
+                 (:test-root-directory (testkick-test-test-root-directory test))))
+  (compile (concat (testkick-test-command test) " " target)))
 
 ;;
 ;; temp buffer
