@@ -133,6 +133,15 @@
       (testkick-test-run it file-or-directory)
     (message "no such test code.")))
 
+;;;###autoload
+(defun testkick-toggle ()
+  (interactive)
+  (testkick-aand buffer-file-name
+                 (testkick-find-test-for-file it)
+                 (testkick-test-test-file it)
+                 (and (file-exists-p it)
+                      (find-file it))))
+
 ;; 
 ;; find test target
 ;;
