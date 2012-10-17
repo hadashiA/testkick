@@ -217,7 +217,8 @@
 (defun testkick-test-run (test target)
   (setq target (case target
                  (:test-file (testkick-test-test-file test))
-                 (:test-root-directory (testkick-test-test-root-directory test))))
+                 (:test-root-directory (testkick-test-test-root-directory test))
+                 (t target)))
   (compile (concat (testkick-test-command test) " " target)))
 
 ;;
