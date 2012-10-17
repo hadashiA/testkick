@@ -107,9 +107,6 @@
 ;; caching
 ;;
 
-(defvar testkick-test-root nil)
-(make-variable-buffer-local 'testkick-test-root)
-
 (defvar testkick-test nil)
 (make-variable-frame-local 'testkick-test)
 
