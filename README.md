@@ -12,17 +12,17 @@ Supported test frameworks.
 
 ## Usage
 
-Run your testcode of current file.
+Run your testcodRun your test code associated of current buffere of current file.
 ```
 M-x testkick
 ```
 
-Run project test root directory.
+Run your test root directory of current project. 
 ```
 M-x testkick-root
 ```
 
-Run specify file or directory
+Run with specify file or directory
 ```
 M-x testkick-at
 ```
@@ -49,6 +49,7 @@ Additional
 ```
 
 ## TODO
+* More settings.
 * Interactive interface
 * Test case filter and run (rspec --line, vows -r, etc..)
 * Caching
