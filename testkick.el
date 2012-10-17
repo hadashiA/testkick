@@ -206,7 +206,7 @@
   (when (file-directory-p file)
     (return-from testkick-test-from-file))
 
-  (with-current-buffer (testkick-temp-buffer file)
+  (with-current-buffer (testkick-search-buffer file)
     (testkick-alist-loop (name command test-syntax-pattern)
       (goto-char (point-min))
       (when (re-search-forward test-syntax-pattern nil t)
@@ -225,7 +225,7 @@
 ;; temp buffer
 ;;
 
-(defun testkick-temp-buffer (file)
+(defun testkick-search-buffer (file)
   (or (get-file-buffer file)
       (with-current-buffer (get-buffer-create "*testkick temp*")
         (erase-buffer)
