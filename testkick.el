@@ -25,21 +25,18 @@
      (command . "rspec --color --format documentation")
      (test-file-pattern   . "_spec\\.rb$")
      (test-syntax-pattern . "^\\s-*describe\\s-+\\S-+\\s-+do")
-     (test-root-basename  . "spec")
      )
     
     ("vows"
      (command . "vows --spec")
      (test-file-pattern   . "\\.js$")
      (test-syntax-pattern . "vows\\.describe(.+[^\\S-]*.*addBatch(")
-     (test-root-basename  . "test")
      )
 
     ("mocha"
      (command . "mocha --reporter spec")
      (test-file-pattern   . "\\.js$")
      (test-syntax-pattern . "^\\s-*describe\\s-*(\\s-*['\"]\\S-+['\"]\\s-*,\\s-*function\\s-*(")
-     (test-root-basename  . "test")
      )
     ))
 
@@ -177,21 +174,18 @@
   (unless (file-directory-p cur-dir)
     (setq cur-dir (file-name-directory cur-dir)))
 
-  (testkick-alist-loop (test-root-basename)
-    (let* ((like-it-dir (and test-root-basename
-                             (testkick-find-file-in-same-project
-                              cur-dir
-                              #'(lambda (path)
-                                  (when (and (file-directory-p path)
-                                             (string= test-root-basename
-                                                      (testkick-file-basename path)))
-                                    path))
-                              1)))
-           (test (when like-it-dir
-                   (testkick-find-file-recursive like-it-dir #'testkick-test-from-file))))
-      (when test
-        (setf (testkick-test-test-root-directory test) like-it-dir)
-        (return-from testkick-find-test-root test)))))
+  (let* ((like-it-dir (and (testkick-find-file-in-same-project
+                            cur-dir
+                            #'(lambda (path)
+                                (when (and (file-directory-p path)
+                                           (testkick-test-root-directory-name-p path))
+                                  path))
+                            1)))
+         (test (when like-it-dir
+                 (testkick-find-file-recursive like-it-dir #'testkick-test-from-file))))
+    (when test
+      (setf (testkick-test-test-root-directory test) like-it-dir)
+      (return-from testkick-find-test-root test))))
 
 (defun* testkick-find-test-for-file (source-file)
   (when (file-directory-p source-file)
@@ -221,6 +215,12 @@
          (match-pos (string-match (replace-regexp-in-string "\\..+?$" "" source-basename)
                                   test-basename)))
     (and match-pos (= 0 match-pos))))
+
+(defun testkick-test-root-directory-name-p (path)
+  (let ((basename (testkick-file-basename path)))
+    (loop for pattern in '("test" "spec")
+          thereis (string= pattern basename)
+          )))
 
 ;; 
 ;; testkick-test methods
