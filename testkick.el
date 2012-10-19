@@ -198,14 +198,14 @@
                      (testkick-find-file-recursive
                       it #'(lambda (test-file)
                              (when (and (null (file-directory-p test-file))
-                                        (testkick-equal-to-test-file source-file test-file))
+                                        (testkick-match-to-test-file source-file test-file))
                                test-file)))
                      (testkick-test-from-file it)
                      (with-current-buffer (get-file-buffer source-file)
                        (setf (testkick-test-source-file it) source-file)
                        (setq testkick-test it)))))
 
-(defun* testkick-equal-to-test-file (source-file test-file)
+(defun* testkick-match-to-test-file (source-file test-file)
   (when (file-directory-p test-file)
     (return-from testkick-match-to-test-file))
 
