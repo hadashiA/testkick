@@ -143,11 +143,12 @@
 ;;;###autoload
 (defun testkick-toggle ()
   (interactive)
-  (testkick-aand buffer-file-name
-                 (testkick-find-test-for-file it)
-                 (testkick-test-test-file it)
-                 (and (file-exists-p it)
-                      (find-file it))))
+  (testkick-awhen  (and buffer-file-name
+                        (testkick-find-test-for-file buffer-file-name))
+    (find-file (if (file-equal-p (testkick-test-test-file it)
+                                 buffer-file-name)
+                   (testkick-test-test-file it)
+                 (testkick-test-find-source-file it)))))
 
 ;; 
 ;; settings helper
