@@ -235,8 +235,7 @@
       (goto-char (point-min))
       (when (re-search-forward test-syntax-pattern nil t)
         (return-from testkick-test-from-file
-          (testkick-awhen (new-testkick-test name :command command :test-file file)
-            (setq testkick-test it)))
+          (setq testkick-test (new-testkick-test name :command command :test-file file)))
         ))))
 
 (defun testkick-test-run (test target)
