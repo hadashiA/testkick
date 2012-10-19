@@ -201,11 +201,9 @@
                                         (testkick-equal-to-test-file source-file test-file))
                                test-file)))
                      (testkick-test-from-file it)
-                     (progn
+                     (with-current-buffer (get-file-buffer source-file)
                        (setf (testkick-test-source-file it) source-file)
-                       (with-current-buffer (get-file-buffer source-file)
-                         (setq testkick-test it))
-                       it))))
+                       (setq testkick-test it)))))
 
 (defun* testkick-equal-to-test-file (source-file test-file)
   (when (file-directory-p test-file)
