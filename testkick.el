@@ -174,7 +174,7 @@
 (defun* testkick-find-test-root (cur-dir)
   (unless (file-directory-p cur-dir)
     (setq cur-dir (file-name-directory cur-dir)))
-
+  
   (let* ((like-it-dir (and (testkick-find-file-in-same-project
                             cur-dir
                             #'(lambda (path)
@@ -244,11 +244,15 @@
                      (:test-root-directory (testkick-test-test-root-directory test))
                      (t target)))))
 
-(defun testkick-test-find-source-file (test)
-  (or (testkick-test-source-file test)
-      (testkick-awhen (read-file-name "Enter source file path: ")
-        (setf (testkick-test-source-file test) it)
-        )))
+(defun* testkick-test-source-file-or-find (test)
+  (let ((source-file (or (testkick-test-source-file test)
+                         (read-file-name "Enter source file path: "))))
+    (unless (file-exists-p source-file)
+      (return-from testkick-test-source-file-or-find))
+    
+    (with-current-buffer (get-file-buffer it)
+      (setq testkick-test test))
+    (setf (testkick-test-source-file test) source-file)))
 
 ;;
 ;; temp buffer
