@@ -22,11 +22,6 @@ Run your test root directory of current project.
 M-x testkick-root
 ```
 
-Run with specify file or directory
-```
-M-x testkick-at
-```
-
 ## Installation
 
 1. Copy testkick.el file to your load-path.
