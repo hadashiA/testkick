@@ -124,7 +124,7 @@
           (setq testkick-test it)
           (testkick-test-run it))
 
-      (testkick-aif (or (testkick-test-find-for-file buffer-file-name)
+      (testkick-aif (or (testkick-find-test-for-file buffer-file-name)
                         (testkick-test-from-read-test-file-name
                          "test not found. please enter test file path: "))
           (testkick-test-run it)))))
@@ -169,19 +169,16 @@
 ;;
 
 (defun* testkick-find-test-root-directory (cur-dir)
-  (when testkick-test-root-directory
-    (return-from testkick-find-test-root-directory testkick-test-root-directory))
-
   (unless (file-directory-p cur-dir)
     (setq cur-dir (file-name-directory cur-dir)))
   
-  (testkick-aif
-   (testkick-find-file-in-same-project
-    cur-dir #'(lambda (path)
-                (when (and (file-directory-p path)
-                           (testkick-test-root-directory-name-p path)
-                           (testkick-find-file-recursive path #'testkick-test-from-file 3))
-                  path)) 1)
+  (testkick-aif (testkick-find-file-in-same-project
+                 cur-dir #'(lambda (path)
+                             (when (and (file-directory-p path)
+                                        (testkick-test-root-directory-name-p path)
+                                        (testkick-find-file-recursive path
+                                                                      #'testkick-test-from-file 3))
+                               path)) 1)
       it
     (read-directory-name "Enter a test root directory: ")))
     
@@ -198,7 +195,7 @@
           (return-from testkick-find-test-for-file testkick-test))))
 
     (or (testkick-test-from-file source-file)
-        (testkick-aand (testkick-test-test-root-directory (file-name-directory source-file))
+        (testkick-aand (testkick-find-test-root-directory (file-name-directory source-file))
                        (testkick-find-file-recursive
                         it #'(lambda (test-file)
                                (when (and (null (file-directory-p test-file))
@@ -242,11 +239,12 @@
     (return-from testkick-test-from-file))
 
   (testkick-alist-loop (name command test-syntax-pattern)
-    (goto-char (point-min))
-    (when (re-search-forward test-syntax-pattern nil t)
-      (return-from testkick-test-from-file
-        (new-testkick-test name :command command :test-file file)))))
-
+    (with-current-buffer (testkick-search-buffer file)
+      (goto-char (point-min))
+      (when (re-search-forward test-syntax-pattern nil t)
+        (return-from testkick-test-from-file
+          (new-testkick-test name :command command :test-file file))))))
+  
 (defun testkick-test-from-read-test-file-name (&optional prompt)
   (let ((file (read-file-name (or (or prompt "Test file: ")))))
     (or (testkick-test-from-file file)
@@ -276,17 +274,7 @@
 
 (defun* testkick-test-find-source-file (test)
   (testkick-awhen (testkick-test-source-file test)
-    (return-from testkick-test-find-source-file it))
-
-  (testkick-awhen (get-file-buffer (testkick-test-test-file test))
-    (with-current-buffer it
-      
-      )
-    
-    )
-
-
-  )
+    (return-from testkick-test-find-source-file it)))
 
 ;;
 ;; temp buffer
