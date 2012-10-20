@@ -116,7 +116,7 @@
   (interactive "P")
 
   (if (null buffer-file-name)
-      (testkick-root sepcify)
+      (testkick-root specify)
     (if specify
         (testkick-awhen (testkick-test-from-read-test-file-name)
           (with-current-buffer (find-file-noselect (testkick-test-test-file it))
