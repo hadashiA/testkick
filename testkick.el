@@ -164,7 +164,7 @@
                        (testkick-find-test-for-file buffer-file-name))
     (find-file (if (file-equal-p (testkick-test-test-file it)
                                  buffer-file-name)
-                   (testkick-test-find-source-file it)
+                   (testkick-test-source-file-or-find it)
                  (testkick-test-test-file it)
                  ))))
 
@@ -212,27 +212,28 @@
     (when buf
       (with-current-buffer buf
         (when testkick-test
-          (return-from testkick-find-test-for-file testkick-test))))
+          (return-from testkick-find-test-for-file testkick-test)))))
 
-    (or (testkick-test-from-file source-file)
-        (testkick-aand (testkick-find-test-root-directory (file-name-directory source-file))
-                       (testkick-find-file-recursive
-                        it #'(lambda (test-file)
-                               (when (and (null (file-directory-p test-file))
-                                          (testkick-match-to-test-file source-file test-file))
-                                 test-file))
-                        5)
-                       (testkick-test-from-file it)
-                       (progn
-                         (unless (file-equal-p source-file
-                                               (testkick-test-test-file it))
-                           (setf (testkick-test-source-file it) source-file))
-                         
-                         (with-current-buffer (find-file-noselect source-file)
-                           (setq testkick-test it))
-                         (with-current-buffer (find-file-noselect (testkick-test-test-file it))
-                           (setq testkick-test it))
-                         it)))))
+  (let ((test (or (testkick-test-from-file source-file)
+                  (testkick-aand (testkick-find-test-root-directory (file-name-directory source-file))
+                                 (testkick-find-file-recursive
+                                  it #'(lambda (test-file)
+                                         (when (and (null (file-directory-p test-file))
+                                                    (testkick-match-to-test-file source-file test-file))
+                                           test-file))
+                                  5)
+                                 (testkick-test-from-file it)
+                                 (progn
+                                   (unless (file-equal-p source-file
+                                                         (testkick-test-test-file it))
+                                     (setf (testkick-test-source-file it) source-file))
+                                   it)))))
+              
+    (with-current-buffer (find-file-noselect source-file)
+      (setq testkick-test test))
+    (with-current-buffer (find-file-noselect (testkick-test-test-file test))
+      (setq testkick-test test))
+    ))
 
 (defun* testkick-match-to-test-file (source-file test-file)
   (when (file-directory-p test-file)
@@ -287,17 +288,10 @@
 
 (defun* testkick-test-source-file-or-find (test)
   (let ((source-file (or (testkick-test-source-file test)
-                         (read-file-name "Enter source file path: "))))
-    (unless (file-exists-p source-file)
-      (return-from testkick-test-source-file-or-find))
-    
-    (with-current-buffer (get-file-buffer it)
+                         (read-file-name "Enter a source file: "))))
+    (with-current-buffer (find-file-noselect source-file)
       (setq testkick-test test))
     (setf (testkick-test-source-file test) source-file)))
-
-(defun* testkick-test-find-source-file (test)
-  (testkick-awhen (testkick-test-source-file test)
-    (return-from testkick-test-find-source-file it)))
 
 ;;
 ;; temp buffer
