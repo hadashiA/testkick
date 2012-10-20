@@ -40,8 +40,8 @@ Additional
 
 ```cl
 ;; Settings for your shorthand.
-(global-set-key [?\C-.] 'testkick)
-(global-set-key [?\C-,] 'testkick-toggle)
+(global-set-key (kbd "C-`") 'testkick)
+(global-set-key (kbd "C-+") 'testkick-toggle)
 
 ;; Coloring on the results of shell command. Handle escape sequences correctly
 (autoload 'ansi-color-for-comint-mode-on "ansi-color"

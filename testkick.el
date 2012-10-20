@@ -22,7 +22,21 @@
 
 (defvar testkick-alist
   '(("rspec"
-     (command . "rspec --color --format documentation")
+     (command . (lambda (test-file)
+                  (let ((rspec-command "rspec --color --format documentation")
+                        (gemfile (testkick-find-file-in-same-project
+                                  test-file
+                                  #'(lambda (file)
+                                      (unless (file-directory-p file)
+                                        (when (string=
+                                               (file-name-nondirectory file)
+                                               "Gemfile")
+                                          file)))
+                                  1)))
+                    (if gemfile
+                        (format "BUNDLE_GEMFILE=%s bundle exec %s %s"
+                                gemfile rspec-command test-file)
+                      (concat rspec-command " " test-file)))))
      (test-file-pattern   . "_spec\\.rb$")
      (test-syntax-pattern . "^\\s-*describe\\s-+\\S-+\\s-+do")
      )
@@ -262,11 +276,18 @@
 ;; 
 
 (defun testkick-test-run (test &optional target)
-  (compile (concat (testkick-test-command test) " "
-                   (case (or target :test-file)
-                     (:test-file (testkick-test-test-file test))
-                     (:test-root-directory (testkick-test-test-root-directory test))
-                     (t target)))))
+  (setq target (case (or target :test-file)
+                 (:test-file (testkick-test-test-file test))
+                 (:test-root-directory (testkick-test-test-root-directory test))
+                 (t target)))
+  (let ((command-or-func  (testkick-test-command test)))
+    (princ command-or-func)
+    (princ (type-of command-or-func))
+    (princ (functionp command-or-func))
+
+    (compile (if (functionp command-or-func)
+                 (funcall command-or-func target)
+               (concat command-or-func " " target)))))
 
 (defun* testkick-test-source-file-or-find (test)
   (let ((source-file (or (testkick-test-source-file test)
@@ -310,6 +331,10 @@
   (directory-files directory t "^[^.]" t))
 
 (defun* testkick-find-file-in-same-project (start-directory callback max-depth)
+  (unless (file-directory-p start-directory)
+    (setq start-directory (file-name-directory
+                           (expand-file-name start-directory))))
+
   (loop for count from 0 to testkick-directory-search-parent-limit
         for cur-dir = (expand-file-name
                        (concat start-directory (apply #'concat (make-list count "/.."))))
@@ -322,6 +347,9 @@
   (when (and max-depth
              (>= depth max-depth))
     (return-from testkick-find-file-recursive))
+
+  (unless (file-directory-p cur-dir)
+    (setq cur-dir (file-name-directory (expand-file-name cur-dir))))
 
   (let ((files (testkick-directory-files-without-dot cur-dir)))
     (when files
