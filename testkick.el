@@ -246,10 +246,7 @@
     (and match-pos (= 0 match-pos))))
 
 (defun testkick-test-root-directory-name-p (path)
-  (let ((basename (testkick-file-basename path)))
-    (loop for pattern in '("test" "spec")
-          thereis (string= pattern basename)
-          )))
+  (string-match "/\\(tests?\\|spec\\)$" path))
 
 ;; 
 ;; create testkick-test obj
