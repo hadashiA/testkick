@@ -281,10 +281,6 @@
                  (:test-root-directory (testkick-test-test-root-directory test))
                  (t target)))
   (let ((command-or-func  (testkick-test-command test)))
-    (princ command-or-func)
-    (princ (type-of command-or-func))
-    (princ (functionp command-or-func))
-
     (compile (if (functionp command-or-func)
                  (funcall command-or-func target)
                (concat command-or-func " " target)))))
