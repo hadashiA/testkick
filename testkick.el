@@ -118,7 +118,8 @@
   (if (null buffer-file-name)
       (testkick-root specify)
     (if specify
-        (testkick-awhen (testkick-test-from-read-test-file-name)
+        (testkick-aif (null (testkick-test-from-read-test-file-name))
+            (message "sorry. no such test code: %s" it)
           (with-current-buffer (find-file-noselect (testkick-test-test-file it))
             (setq testkick-test it))
           (setq testkick-test it)
@@ -149,8 +150,9 @@
                        (testkick-find-test-for-file buffer-file-name))
     (find-file (if (file-equal-p (testkick-test-test-file it)
                                  buffer-file-name)
-                   (testkick-test-test-file it)
-                 (testkick-test-find-source-file it)))))
+                   (testkick-test-find-source-file it)
+                 (testkick-test-test-file it)
+                 ))))
 
 ;; 
 ;; settings helper

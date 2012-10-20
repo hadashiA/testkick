@@ -22,6 +22,11 @@ Run your test root directory of current project.
 M-x testkick-root
 ```
 
+Find file  test-file/source-file toggle.
+```
+M-x testkick-toggle
+```
+
 ## Installation
 
 1. Copy testkick.el file to your load-path.
@@ -45,8 +50,6 @@ Additional
 
 ## TODO
 * More settings.
-* Interactive interface
 * Test case filter and run (rspec --line, vows -r, etc..)
-* Caching
 * anything interface
 
