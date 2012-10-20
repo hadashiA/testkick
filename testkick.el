@@ -206,11 +206,11 @@
                        (progn
                          (unless (file-equal-p source-file
                                                (testkick-test-test-file it))
-                           (setf (testkick-test-source-file) source-file))
+                           (setf (testkick-test-source-file it) source-file))
                          
                          (with-current-buffer (find-file-noselect source-file)
                            (setq testkick-test it))
-                         (with-current-buffer (find-file-noselect test-file)
+                         (with-current-buffer (find-file-noselect (testkick-test-test-file it))
                            (setq testkick-test it))
                          it)))))
 
