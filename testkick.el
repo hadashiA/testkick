@@ -44,10 +44,6 @@
   "Number of times up to look for a parent directory"
   :group 'testkick)
 
-(defcustom testkick-directory-search-depth-limit 7
-  "Number of times down to look for a child directories"
-  :group 'testkick)
-
 ;;
 ;; macros
 ;;
@@ -105,7 +101,7 @@
   )
 
 ;; 
-;; caching
+;; buffer local
 ;;
 
 (defvar testkick-test nil)
@@ -116,35 +112,37 @@
 ;; 
 
 ;;;###autoload
-(defun testkick ()
-  (interactive)
-  (if buffer-file-name
-      (testkick-aif (testkick-find-test-for-file buffer-file-name)
-          (testkick-test-run it)
-        (message "test not found."))
-    nil))
-  
-;;;###autoload
-(defun testkick-root ()
-  (interactive)
-  (testkick-awhen (testkick-find-test-root (testkick-current-directory))
-    (testkick-test-run it :test-root-directory)))
+(defun testkick (&optional specify)
+  (interactive "P")
+
+  (if (null buffer-file-name)
+      (testkick-root sepcify)
+    (if specify
+        (testkick-awhen (testkick-test-from-read-test-file-name)
+          (with-current-buffer (find-file-noselect (testkick-test-test-file it))
+            (setq testkick-test it))
+          (setq testkick-test it)
+          (testkick-test-run it))
+
+      (testkick-aif (or (testkick-test-find-for-file buffer-file-name)
+                        (testkick-test-from-read-test-file-name
+                         "test not found. please enter test file path: "))
+          (testkick-test-run it)))))
 
 ;;;###autoload
-(defun testkick-at (file-or-directory)
-  (interactive "ftest file or directory: ")
-  (testkick-aif (if (file-directory-p file-or-directory)
-                    (testkick-find-file-recursive file-or-directory
-                                                  #'testkick-test-from-file)
-                  (testkick-test-from-file file-or-directory))
-      (testkick-test-run it file-or-directory)
-    (message "no such test code.")))
+(defun testkick-root (&optional specify)
+  (interactive "P")
+  (let ((test-root-directory (testkick-find-test-root-directory (testkick-current-directory))))
+    (testkick-aand test-root-directory
+                   (testkick-find-file-recursive test-root-directory
+                                                 #'testkick-test-from-file 5)
+                   (testkick-test-run it test-root-directory))))
 
 ;;;###autoload
-(defun testkick-toggle ()
-  (interactive)
-  (testkick-awhen  (and buffer-file-name
-                        (testkick-find-test-for-file buffer-file-name))
+(defun testkick-toggle (&optional specify)
+  (interactive "P")
+  (testkick-awhen (and buffer-file-name
+                       (testkick-find-test-for-file buffer-file-name))
     (find-file (if (file-equal-p (testkick-test-test-file it)
                                  buffer-file-name)
                    (testkick-test-test-file it)
@@ -164,46 +162,60 @@
               for val = (cdr cons)
               do (setf (cdr (assoc key alist)) val)
               )
-      (add-to-list 'testkick-alist (cons name update-alist) t))
-    ))
+      (add-to-list 'testkick-alist (cons name update-alist) t))))
 
 ;; 
 ;; find test target
 ;;
 
-(defun* testkick-find-test-root (cur-dir)
+(defun* testkick-find-test-root-directory (cur-dir)
+  (when testkick-test-root-directory
+    (return-from testkick-find-test-root-directory testkick-test-root-directory))
+
   (unless (file-directory-p cur-dir)
     (setq cur-dir (file-name-directory cur-dir)))
   
-  (let* ((like-it-dir (and (testkick-find-file-in-same-project
-                            cur-dir
-                            #'(lambda (path)
-                                (when (and (file-directory-p path)
-                                           (testkick-test-root-directory-name-p path))
-                                  path))
-                            1)))
-         (test (when like-it-dir
-                 (testkick-find-file-recursive like-it-dir #'testkick-test-from-file))))
-    (when test
-      (setf (testkick-test-test-root-directory test) like-it-dir)
-      (return-from testkick-find-test-root test))))
+  (testkick-aif
+   (testkick-find-file-in-same-project
+    cur-dir #'(lambda (path)
+                (when (and (file-directory-p path)
+                           (testkick-test-root-directory-name-p path)
+                           (testkick-find-file-recursive path #'testkick-test-from-file 3))
+                  path)) 1)
+      it
+    (read-directory-name "Enter a test root directory: ")))
+    
 
+;; find test associated soruce-file or cache
 (defun* testkick-find-test-for-file (source-file)
   (when (file-directory-p source-file)
     (return-from testkick-find-test-for-file))
 
-  (or (testkick-test-from-file source-file)
-      (testkick-aand (testkick-find-test-root (file-name-directory source-file))
-                     (testkick-test-test-root-directory it)
-                     (testkick-find-file-recursive
-                      it #'(lambda (test-file)
-                             (when (and (null (file-directory-p test-file))
-                                        (testkick-match-to-test-file source-file test-file))
-                               test-file)))
-                     (testkick-test-from-file it)
-                     (with-current-buffer (get-file-buffer source-file)
-                       (setf (testkick-test-source-file it) source-file)
-                       (setq testkick-test it)))))
+  (let ((buf (get-file-buffer source-file)))
+    (when buf
+      (with-current-buffer buf
+        (when testkick-test
+          (return-from testkick-find-test-for-file testkick-test))))
+
+    (or (testkick-test-from-file source-file)
+        (testkick-aand (testkick-test-test-root-directory (file-name-directory source-file))
+                       (testkick-find-file-recursive
+                        it #'(lambda (test-file)
+                               (when (and (null (file-directory-p test-file))
+                                          (testkick-match-to-test-file source-file test-file))
+                                 test-file))
+                        5)
+                       (testkick-test-from-file it)
+                       (progn
+                         (unless (file-equal-p source-file
+                                               (testkick-test-test-file it))
+                           (setf (testkick-test-source-file) source-file))
+                         
+                         (with-current-buffer (find-file-noselect source-file)
+                           (setq testkick-test it))
+                         (with-current-buffer (find-file-noselect test-file)
+                           (setq testkick-test it))
+                         it)))))
 
 (defun* testkick-match-to-test-file (source-file test-file)
   (when (file-directory-p test-file)
@@ -222,20 +234,28 @@
           )))
 
 ;; 
-;; testkick-test methods
+;; create testkick-test obj
 ;; 
 
 (defun* testkick-test-from-file (file)
   (when (file-directory-p file)
     (return-from testkick-test-from-file))
 
-  (with-current-buffer (testkick-search-buffer file)
-    (testkick-alist-loop (name command test-syntax-pattern)
-      (goto-char (point-min))
-      (when (re-search-forward test-syntax-pattern nil t)
-        (return-from testkick-test-from-file
-          (setq testkick-test (new-testkick-test name :command command :test-file file)))
-        ))))
+  (testkick-alist-loop (name command test-syntax-pattern)
+    (goto-char (point-min))
+    (when (re-search-forward test-syntax-pattern nil t)
+      (return-from testkick-test-from-file
+        (new-testkick-test name :command command :test-file file)))))
+
+(defun testkick-test-from-read-test-file-name (&optional prompt)
+  (let ((file (read-file-name (or (or prompt "Test file: ")))))
+    (or (testkick-test-from-file file)
+        (and (message "Don't know what one test.")
+             nil))))
+
+;; 
+;; testkick-test methods
+;; 
 
 (defun testkick-test-run (test &optional target)
   (compile (concat (testkick-test-command test) " "
@@ -253,6 +273,20 @@
     (with-current-buffer (get-file-buffer it)
       (setq testkick-test test))
     (setf (testkick-test-source-file test) source-file)))
+
+(defun* testkick-test-find-source-file (test)
+  (testkick-awhen (testkick-test-source-file test)
+    (return-from testkick-test-find-source-file it))
+
+  (testkick-awhen (get-file-buffer (testkick-test-test-file test))
+    (with-current-buffer it
+      
+      )
+    
+    )
+
+
+  )
 
 ;;
 ;; temp buffer
