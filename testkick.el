@@ -132,11 +132,15 @@
 ;;;###autoload
 (defun testkick-root (&optional specify)
   (interactive "P")
-  (let ((test-root-directory (testkick-find-test-root-directory (testkick-current-directory))))
-    (testkick-aand test-root-directory
-                   (testkick-find-file-recursive test-root-directory
-                                                 #'testkick-test-from-file 5)
-                   (testkick-test-run it test-root-directory))))
+  (let* ((test-root-directory (if specify
+                                 (read-directory-name "test root directory: ")
+                               (testkick-find-test-root-directory (testkick-current-directory))))
+         (test (and test-root-directory
+                    (testkick-find-file-recursive test-root-directory
+                                                  #'testkick-test-from-file 5))))
+    (if test
+        (testkick-test-run test test-root-directory)
+      (message "not such test file in %s" test-root-directory))))
 
 ;;;###autoload
 (defun testkick-toggle (&optional specify)
