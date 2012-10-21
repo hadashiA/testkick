@@ -131,18 +131,9 @@
 
   (if (null buffer-file-name)
       (testkick-root specify)
-    (if specify
-        (testkick-aif (null (testkick-test-from-read-test-file-name))
-            (message "sorry. no such test code: %s" it)
-          (with-current-buffer (find-file-noselect (testkick-test-test-file it))
-            (setq testkick-test it))
-          (setq testkick-test it)
-          (testkick-test-run it))
-
-      (testkick-aif (or (testkick-find-test-for-file buffer-file-name)
-                        (testkick-test-from-read-test-file-name
-                         "test not found. please enter test file path: "))
-          (testkick-test-run it)))))
+    (testkick-aif (testkick-find-test-for-file buffer-file-name)
+        (testkick-test-run it)
+      (message "Sorry. No such test code: %s" buffer-file-name))))
 
 ;;;###autoload
 (defun testkick-root (&optional specify)
@@ -167,6 +158,11 @@
                    (testkick-test-source-file-or-find it)
                  (testkick-test-test-file it)
                  ))))
+
+(defun testkick-cache-clear ()
+  (loop for buf in (buffer-list)
+        do (with-current-buffer buf
+             (setq testkick-test nil))))
 
 ;; 
 ;; settings helper
@@ -204,36 +200,43 @@
     
 
 ;; find test associated soruce-file or cache
-(defun* testkick-find-test-for-file (source-file)
+(defun* testkick-find-test-for-file (source-file &optional specify prompt)
   (when (file-directory-p source-file)
-    (return-from testkick-find-test-for-file))
+    (error "Not a file %s" soruce-file))
 
-  (let ((buf (get-file-buffer source-file)))
-    (when buf
-      (with-current-buffer buf
-        (when testkick-test
-          (return-from testkick-find-test-for-file testkick-test)))))
+  (let ((test (if specify
+                  (testkick-test-from-read-test-file-name prompt)
+                (or (let ((buf (get-file-buffer source-file)))
+                      (when buf
+                        (with-current-buffer buf
+                          (if (testkick-test-p testkick-test)
+                              testkick-test
+                            (setq testkick-test nil)))))
 
-  (let ((test (or (testkick-test-from-file source-file)
-                  (testkick-aand (testkick-find-test-root-directory (file-name-directory source-file))
-                                 (testkick-find-file-recursive
-                                  it #'(lambda (test-file)
-                                         (when (and (null (file-directory-p test-file))
-                                                    (testkick-match-to-test-file source-file test-file))
-                                           test-file))
-                                  5)
-                                 (testkick-test-from-file it)
-                                 (progn
-                                   (unless (file-equal-p source-file
-                                                         (testkick-test-test-file it))
-                                     (setf (testkick-test-source-file it) source-file))
-                                   it)))))
-              
-    (with-current-buffer (find-file-noselect source-file)
-      (setq testkick-test test))
-    (with-current-buffer (find-file-noselect (testkick-test-test-file test))
-      (setq testkick-test test))
-    ))
+                    (testkick-test-from-file source-file)
+                    
+                    (testkick-aand (testkick-find-test-root-directory (file-name-directory source-file))
+                                   (testkick-find-file-recursive
+                                    it #'(lambda (test-file)
+                                           (when (and (null (file-directory-p test-file))
+                                                      (testkick-match-to-test-file source-file test-file))
+                                             test-file))
+                                    5)
+                                   (testkick-test-from-file it))
+
+                    (testkick-test-from-read-test-file-name
+                     "Test not found. Please enter test file path: ")))))
+    (unless (file-equal-p source-file
+                          (testkick-test-test-file test))
+      (setf (testkick-test-source-file test) source-file))
+
+    (testkick-awhen (testkick-test-test-file test)
+      (with-current-buffer (find-file-noselect it)
+        (setq testkick-test it)))
+    (testkick-awhen (testkick-test-source-file test)
+      (with-current-buffer (find-file-noselect it)
+        (setq testkick-test it)))
+    test))
 
 (defun* testkick-match-to-test-file (source-file test-file)
   (when (file-directory-p test-file)
@@ -264,7 +267,7 @@
           (new-testkick-test name :command command :test-file file))))))
   
 (defun testkick-test-from-read-test-file-name (&optional prompt)
-  (let ((file (read-file-name (or (or prompt "Test file: ")))))
+  (let ((file (read-file-name (or prompt "Test file: "))))
     (or (testkick-test-from-file file)
         (and (message "Don't know what one test.")
              nil))))
@@ -286,8 +289,6 @@
 (defun* testkick-test-source-file-or-find (test)
   (let ((source-file (or (testkick-test-source-file test)
                          (read-file-name "Enter a source file: "))))
-    (with-current-buffer (find-file-noselect source-file)
-      (setq testkick-test test))
     (setf (testkick-test-source-file test) source-file)))
 
 ;;
