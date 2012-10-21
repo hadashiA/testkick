@@ -232,10 +232,10 @@
 
     (testkick-awhen (testkick-test-test-file test)
       (with-current-buffer (find-file-noselect it)
-        (setq testkick-test it)))
+        (setq testkick-test test)))
     (testkick-awhen (testkick-test-source-file test)
       (with-current-buffer (find-file-noselect it)
-        (setq testkick-test it)))
+        (setq testkick-test test)))
     test))
 
 (defun* testkick-match-to-test-file (source-file test-file)
