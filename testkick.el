@@ -22,33 +22,36 @@
 
 (defvar testkick-alist
   '(("rspec"
-     (command . (lambda (test-file)
-                  (let ((rspec-command "rspec --color --format documentation")
-                        (gemfile (testkick-find-file-in-same-project
-                                  test-file
-                                  #'(lambda (file)
-                                      (unless (file-directory-p file)
-                                        (when (string=
-                                               (file-name-nondirectory file)
-                                               "Gemfile")
-                                          file)))
-                                  1)))
+     (command . (lambda (test-target)
+                  (let ((rspec-command (concat "rspec --color --format documentation "
+                                               test-target))
+                        (gemfile (testkick-find-gemfile test-target)))
                     (if gemfile
-                        (format "BUNDLE_GEMFILE=%s bundle exec %s %s"
-                                gemfile rspec-command test-file)
-                      (concat rspec-command " " test-file)))))
+                        (format "BUNDLE_GEMFILE=%s bundle exec %s" gemfile rspec-command)
+                      rspec-command))))
      (test-file-pattern   . "_spec\\.rb$")
      (test-syntax-pattern . "^\\s-*describe\\s-+\\S-+\\s-+do")
      )
     
     ("vows"
-     (command . "vows --spec")
+     (command . (lambda (test-target)
+                  (let ((vows-command (concat "vows --spec " test-target))
+                        (node-modules (testkick-find-node-modules-dir test-target)))
+                    (princ node-modules)
+                    (if node-modules
+                        (concat node-modules "/.bin/" vows-command)
+                      vows-command))))
      (test-file-pattern   . "\\.js$")
      (test-syntax-pattern . "vows\\.describe(.+[^\\S-]*.*addBatch(")
      )
 
     ("mocha"
-     (command . "mocha --reporter spec")
+     (command . (lambda (test-target)
+                  (let ((mocha-command (concat "mocha --reporter spec " test-target))
+                        (node-modules (testkick-find-node-modules-dir test-target)))
+                    (if node-modules
+                        (concat node-modules "/.bin/" mocha-command)
+                      mocha-command))))
      (test-file-pattern   . "\\.js$")
      (test-syntax-pattern . "^\\s-*describe\\s-*(\\s-*['\"]\\S-+['\"]\\s-*,\\s-*function\\s-*(")
      )
@@ -301,6 +304,31 @@
         (erase-buffer)
         (insert-file-contents file)
         (current-buffer))))
+
+;; 
+;; find context file
+;; 
+
+(defun testkick-find-gemfile (cur-dir)
+  (testkick-find-file-in-same-project
+   cur-dir
+   #'(lambda (file)
+       (unless (file-directory-p file)
+         (when (string=
+                (file-name-nondirectory file)
+                "Gemfile")
+           file)))
+   1))
+
+(defun testkick-find-node-modules-dir (cur-dir)
+  (testkick-find-file-in-same-project
+   cur-dir
+   #'(lambda (file)
+       (when (and (file-directory-p file)
+                  (string= (file-name-nondirectory file)
+                           "node_modules"))
+         file))
+   1))
 
 ;; 
 ;; generic utils
