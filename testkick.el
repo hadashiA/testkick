@@ -160,7 +160,8 @@
                                  buffer-file-name)
                    (testkick-test-source-file-or-find it)
                  (testkick-test-test-file it)
-                 ))))
+                 ))
+    (setq testkick-test it)))
 
 (defun testkick-cache-clear ()
   (loop for buf in (buffer-list)
