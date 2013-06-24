@@ -30,7 +30,7 @@
                         (format "BUNDLE_GEMFILE=%s bundle exec %s" gemfile rspec-command)
                       rspec-command))))
      (test-file-pattern   . "_spec\\.rb$")
-     (test-syntax-pattern . "^\\s-*describe\\s-+\\S-+\\s-+.*\\s-+do")
+     (test-syntax-pattern . "^\\s-*describe\\s-+\\S-+\\s-+.*do")
      )
     
     ("vows"
